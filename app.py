@@ -9,7 +9,7 @@ from transformers import CLIPProcessor, CLIPModel
 import json
 
 # ==================================================
-# 页面配置 - 沉浸式全屏体验
+# 1. 页面配置 - 沉浸式全屏体验
 # ==================================================
 st.set_page_config(
     page_title="SmartRecycle Pro AI",
@@ -57,11 +57,20 @@ st.markdown("""
     
     /* 去除图片上下的空白 */
     .stImage { margin-bottom: 0px; }
+    
+    /* 徽章样式 */
+    .badge-container {
+        text-align: center;
+        padding: 10px;
+        border-radius: 12px;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==================================================
-# Session State 初始化
+# 2. Session State 初始化
 # ==================================================
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -73,7 +82,7 @@ if "lang" not in st.session_state:
     st.session_state.lang = "kr"  # 默认韩语
 
 # ==================================================
-# 多语言字典 (已修复流程卡片混合语言的问题)
+# 3. 多语言字典 (修复了流程混合显示问题)
 # ==================================================
 TRANSLATIONS = {
     "zh": {
@@ -99,13 +108,19 @@ TRANSLATIONS = {
         "save": "保存设置",
         "low_conf": "⚠️ AI 有点不确定，建议靠近一点再拍",
         "no_data": "暂无数据，快去识别第一件垃圾吧！",
-        # --- 修复部分：流程步骤翻译 ---
+        # --- 流程步骤翻译 ---
         "step1_title": "1. 拍照上传",
         "step1_desc": "上传或拍摄垃圾照片",
         "step2_title": "2. AI 识别",
         "step2_desc": "智能分析垃圾类型",
         "step3_title": "3. 赚取积分",
         "step3_desc": "分类正确获得奖励",
+        # --- 徽章翻译 ---
+        "badges_title": "成就徽章",
+        "badge_starter": "新手",
+        "badge_expert": "达人",
+        "badge_master": "大师",
+        "locked": "未解锁"
     },
     "en": {
         "app_name": "SmartRecycle AI",
@@ -130,13 +145,19 @@ TRANSLATIONS = {
         "save": "Save Changes",
         "low_conf": "⚠️ Low confidence. Try moving closer.",
         "no_data": "No data yet. Start scanning now!",
-        # --- 修复部分：流程步骤翻译 ---
+        # --- Process Steps ---
         "step1_title": "1. Capture",
         "step1_desc": "Take or Upload Photo",
         "step2_title": "2. Analyze",
         "step2_desc": "AI Identifies Waste",
         "step3_title": "3. Reward",
         "step3_desc": "Earn Eco Points",
+        # --- Badges ---
+        "badges_title": "Badges",
+        "badge_starter": "Starter",
+        "badge_expert": "Expert",
+        "badge_master": "Master",
+        "locked": "Locked"
     },
     "kr": {
         "app_name": "스마트 리사이클 AI",
@@ -161,18 +182,24 @@ TRANSLATIONS = {
         "save": "저장",
         "low_conf": "⚠️ AI가 확실하지 않습니다. 더 가까이서 찍어주세요.",
         "no_data": "데이터가 없습니다. 첫 스캔을 시작해보세요!",
-        # --- 修复部分：流程步骤翻译 ---
+        # --- Process Steps (Fixed) ---
         "step1_title": "1. 촬영/업로드",
         "step1_desc": "사진 촬영 또는 앨범 업로드",
         "step2_title": "2. AI 분석",
-        "step2_desc": "지능형 쓰레기 분석",
+        "step2_desc": "쓰레기 종류 자동 인식",
         "step3_title": "3. 보상 받기",
-        "step3_desc": "에코 포인트 적립",
+        "step3_desc": "정확한 분리수거 포인트",
+        # --- Badges ---
+        "badges_title": "배지",
+        "badge_starter": "스타터",
+        "badge_expert": "엑스퍼트",
+        "badge_master": "마스터",
+        "locked": "잠김"
     }
 }
 
 # ==================================================
-# 模型加载 (CLIP Model)
+# 4. 模型加载 (CLIP Model)
 # ==================================================
 @st.cache_resource
 def load_model():
@@ -193,7 +220,7 @@ def load_model():
 processor, model = load_model()
 
 # ==================================================
-# 类别定义 & 颜色配置
+# 5. 类别定义 & 颜色配置
 # ==================================================
 CATEGORY_INFO = {
     "plastic": {
@@ -227,7 +254,7 @@ CATEGORY_INFO = {
 }
 
 # ==================================================
-# AI 分类逻辑 (CLIP + 裁剪)
+# 6. AI 分类逻辑 (CLIP + 裁剪)
 # ==================================================
 def classify_image(image):
     """
@@ -286,7 +313,7 @@ def classify_image(image):
     return label, confidence
 
 # ==================================================
-# UI 渲染
+# 7. UI 渲染开始
 # ==================================================
 
 # --- 顶部导航栏 ---
@@ -327,7 +354,7 @@ st.markdown("---")
 tab1, tab2, tab3, tab4 = st.tabs([t["home"], t["scan"], t["stats"], t["profile"]])
 
 # ==================================================
-# Tab 1: 首页 (已修复)
+# Tab 1: 首页 (✅ 流程语言已修复)
 # ==================================================
 with tab1:
     st.markdown(f"""
@@ -341,7 +368,7 @@ with tab1:
     
     col1, col2, col3 = st.columns(3)
     
-    # 修复：使用翻译变量而不是写死文字
+    # 核心修复点：步骤文字直接从 t 字典获取，不再混合
     steps = [
         ("📸", t['step1_title'], t['step1_desc']),
         ("🧠", t['step2_title'], t['step2_desc']),
@@ -353,8 +380,8 @@ with tab1:
             st.markdown(f"""
             <div style='text-align:center;padding:20px;background:#f8fafc;border-radius:16px;border:1px solid #e2e8f0;'>
                 <div style='font-size:2.5rem;margin-bottom:10px;'>{icon}</div>
-                <div style='font-weight:bold;color:#334155;'>{title}</div>
-                <div style='font-size:0.8rem;color:#94a3b8;'>{desc}</div>
+                <div style='font-weight:bold;color:#334155;font-size:1.1rem;'>{title}</div>
+                <div style='font-size:0.9rem;color:#94a3b8;'>{desc}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -497,7 +524,7 @@ with tab3:
                 """, unsafe_allow_html=True)
 
 # ==================================================
-# Tab 4: 个人资料
+# Tab 4: 个人资料 (✅ 徽章功能增强)
 # ==================================================
 with tab4:
     st.markdown(f"""
@@ -519,24 +546,34 @@ with tab4:
 
     st.markdown("---")
     
-    st.markdown("#### 🏆 Badges")
-    b1, b2, b3 = st.columns(3)
+    # 徽章墙逻辑
+    st.markdown(f"#### 🏆 {t['badges_title']}")
     
+    # 定义徽章的函数：如果积分不足则变灰、透明度降低
+    def render_badge(col, emoji, title_key, required_points, current_points):
+        is_unlocked = current_points >= required_points
+        
+        # 样式控制
+        opacity = "1" if is_unlocked else "0.5"
+        filter_style = "grayscale(0)" if is_unlocked else "grayscale(100%)"
+        status_icon = "✅" if is_unlocked else f"🔒 {required_points}"
+        title = t[title_key] # 从翻译字典获取标题
+        
+        with col:
+            st.markdown(f"""
+            <div style='text-align:center; opacity:{opacity}; filter:{filter_style}; 
+                 padding:15px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;'>
+                <div style='font-size:3.5rem; margin-bottom:10px;'>{emoji}</div>
+                <div style='font-weight:bold; font-size:1rem; margin-bottom:5px; color:#334155;'>{title}</div>
+                <div style='font-size:0.8rem; color:#64748b; font-weight:500;'>{status_icon}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # 布局三列
+    b1, b2, b3 = st.columns(3)
     pts = st.session_state.total_points
     
-    def badge_html(emoji, title, required, current):
-        is_unlocked = current >= required
-        opacity = "1" if is_unlocked else "0.4"
-        grayscale = "0" if is_unlocked else "100%"
-        status = "✅" if is_unlocked else f"🔒 {required}"
-        return f"""
-        <div style='text-align:center;opacity:{opacity};filter:grayscale({grayscale});'>
-            <div style='font-size:3rem;'>{emoji}</div>
-            <div style='font-weight:bold;font-size:0.9rem;margin-top:5px;'>{title}</div>
-            <div style='font-size:0.8rem;color:#64748b;'>{status}</div>
-        </div>
-        """
-        
-    with b1: st.markdown(badge_html("🌱", "Starter", 50, pts), unsafe_allow_html=True)
-    with b2: st.markdown(badge_html("🌿", "Expert", 200, pts), unsafe_allow_html=True)
-    with b3: st.markdown(badge_html("🌳", "Master", 500, pts), unsafe_allow_html=True)
+    # 渲染徽章
+    render_badge(b1, "🌱", "badge_starter", 50, pts)
+    render_badge(b2, "🌿", "badge_expert", 200, pts)
+    render_badge(b3, "🌳", "badge_master", 500, pts)
