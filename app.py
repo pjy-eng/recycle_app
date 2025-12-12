@@ -5,7 +5,7 @@ from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
-from transformers import CLIPProcessor, CLIPModel  # 升级为 CLIP 模型
+from transformers import CLIPProcessor, CLIPModel
 import json
 
 # ==================================================
@@ -18,7 +18,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 隐藏默认元素并美化界面
+# 隐藏默认元素并美化界面 CSS
 st.markdown("""
 <style>
     [data-testid="collapsedControl"] {display: none}
@@ -55,14 +55,8 @@ st.markdown("""
         color: #1e293b;
     }
     
-    /* 卡片容器样式 */
-    .css-card {
-        background: white;
-        padding: 20px;
-        border-radius: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
-    }
+    /* 去除图片上下的空白 */
+    .stImage { margin-bottom: 0px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,12 +68,12 @@ if "history" not in st.session_state:
 if "total_points" not in st.session_state:
     st.session_state.total_points = 0
 if "username" not in st.session_state:
-    st.session_state.username = "环保达人"
+    st.session_state.username = "Green Hero"
 if "lang" not in st.session_state:
-    st.session_state.lang = "kr"  # 默认语言
+    st.session_state.lang = "kr"  # 默认韩语
 
 # ==================================================
-# 多语言字典
+# 多语言字典 (已修复流程卡片混合语言的问题)
 # ==================================================
 TRANSLATIONS = {
     "zh": {
@@ -105,6 +99,13 @@ TRANSLATIONS = {
         "save": "保存设置",
         "low_conf": "⚠️ AI 有点不确定，建议靠近一点再拍",
         "no_data": "暂无数据，快去识别第一件垃圾吧！",
+        # --- 修复部分：流程步骤翻译 ---
+        "step1_title": "1. 拍照上传",
+        "step1_desc": "上传或拍摄垃圾照片",
+        "step2_title": "2. AI 识别",
+        "step2_desc": "智能分析垃圾类型",
+        "step3_title": "3. 赚取积分",
+        "step3_desc": "分类正确获得奖励",
     },
     "en": {
         "app_name": "SmartRecycle AI",
@@ -129,6 +130,13 @@ TRANSLATIONS = {
         "save": "Save Changes",
         "low_conf": "⚠️ Low confidence. Try moving closer.",
         "no_data": "No data yet. Start scanning now!",
+        # --- 修复部分：流程步骤翻译 ---
+        "step1_title": "1. Capture",
+        "step1_desc": "Take or Upload Photo",
+        "step2_title": "2. Analyze",
+        "step2_desc": "AI Identifies Waste",
+        "step3_title": "3. Reward",
+        "step3_desc": "Earn Eco Points",
     },
     "kr": {
         "app_name": "스마트 리사이클 AI",
@@ -153,11 +161,18 @@ TRANSLATIONS = {
         "save": "저장",
         "low_conf": "⚠️ AI가 확실하지 않습니다. 더 가까이서 찍어주세요.",
         "no_data": "데이터가 없습니다. 첫 스캔을 시작해보세요!",
+        # --- 修复部分：流程步骤翻译 ---
+        "step1_title": "1. 촬영/업로드",
+        "step1_desc": "사진 촬영 또는 앨범 업로드",
+        "step2_title": "2. AI 분석",
+        "step2_desc": "지능형 쓰레기 분석",
+        "step3_title": "3. 보상 받기",
+        "step3_desc": "에코 포인트 적립",
     }
 }
 
 # ==================================================
-# 🚀 核心升级：加载 CLIP 模型
+# 模型加载 (CLIP Model)
 # ==================================================
 @st.cache_resource
 def load_model():
@@ -178,7 +193,7 @@ def load_model():
 processor, model = load_model()
 
 # ==================================================
-# 类别定义 (与 CLIP 提示词映射)
+# 类别定义 & 颜色配置
 # ==================================================
 CATEGORY_INFO = {
     "plastic": {
@@ -212,18 +227,16 @@ CATEGORY_INFO = {
 }
 
 # ==================================================
-# 🎯 核心升级：CLIP 分类 + 图像预处理
+# AI 分类逻辑 (CLIP + 裁剪)
 # ==================================================
 def classify_image(image):
     """
     1. 自动裁剪图片中心 (去除背景干扰)
     2. 使用 CLIP 进行文本-图像匹配
     """
-    # -------------------------------------------------
-    # 步骤 1: 图像预处理 (中心裁剪)
-    # -------------------------------------------------
+    # 1. 图像预处理 (中心裁剪)
     width, height = image.size
-    # 取短边的 85% 作为裁剪区域，让 AI 聚焦物体主体
+    # 取短边的 85% 作为裁剪区域
     new_size = min(width, height) * 0.85
     
     left = (width - new_size) / 2
@@ -233,10 +246,8 @@ def classify_image(image):
     
     cropped_image = image.crop((left, top, right, bottom))
     
-    # -------------------------------------------------
-    # 步骤 2: 定义 CLIP 提示词 (Prompt Engineering)
-    # -------------------------------------------------
-    # 这里的顺序必须与下面的 labels 列表一一对应
+    # 2. 定义 CLIP 提示词 (Prompt Engineering)
+    # 顺序必须与下面的 labels 列表一一对应
     labels = ["plastic", "paper", "metal", "glass", "cardboard", "trash"]
     
     # 使用详细的英文描述，CLIP 对英文理解最好
@@ -249,9 +260,7 @@ def classify_image(image):
         "a photo of general trash, food waste, dirty napkins, or mixed garbage" # trash
     ]
     
-    # -------------------------------------------------
-    # 步骤 3: 模型推理
-    # -------------------------------------------------
+    # 3. 模型推理
     inputs = processor(
         text=choices, 
         images=cropped_image, 
@@ -270,20 +279,17 @@ def classify_image(image):
     label = labels[idx.item()]
     confidence = score.item()
     
-    # -------------------------------------------------
-    # 步骤 4: 阈值过滤
-    # -------------------------------------------------
-    # 如果最高匹配度低于 0.35 (CLIP 的 Softmax 分布比较平滑，0.35 已经算有信心了)
+    # 4. 阈值过滤
     if confidence < 0.35:
         return "unknown", confidence
         
     return label, confidence
 
 # ==================================================
-# UI 渲染开始
+# UI 渲染
 # ==================================================
 
-# 顶部导航栏
+# --- 顶部导航栏 ---
 col_left, col_center, col_right = st.columns([1, 2, 1])
 
 with col_left:
@@ -300,6 +306,7 @@ with col_left:
         st.session_state.lang = selected_lang
         st.rerun()
 
+# 获取当前语言包
 t = TRANSLATIONS[st.session_state.lang]
 
 with col_center:
@@ -316,11 +323,11 @@ with col_right:
 
 st.markdown("---")
 
-# 主 Tab 导航
+# --- 主导航 Tab ---
 tab1, tab2, tab3, tab4 = st.tabs([t["home"], t["scan"], t["stats"], t["profile"]])
 
 # ==================================================
-# Tab 1: 首页
+# Tab 1: 首页 (已修复)
 # ==================================================
 with tab1:
     st.markdown(f"""
@@ -333,10 +340,12 @@ with tab1:
     """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
+    
+    # 修复：使用翻译变量而不是写死文字
     steps = [
-        ("📸", "1. Capture", "拍照/上传"),
-        ("🧠", "2. Analyze", "AI 智能分析"),
-        ("🎁", "3. Reward", "赚取积分")
+        ("📸", t['step1_title'], t['step1_desc']),
+        ("🧠", t['step2_title'], t['step2_desc']),
+        ("🎁", t['step3_title'], t['step3_desc'])
     ]
     
     for col, (icon, title, desc) in zip([col1, col2, col3], steps):
@@ -350,13 +359,12 @@ with tab1:
             """, unsafe_allow_html=True)
 
 # ==================================================
-# Tab 2: 扫描 (核心功能)
+# Tab 2: 扫描页面
 # ==================================================
 with tab2:
     st.markdown(f"<h3 style='margin-bottom:20px;'>{t['upload_title']}</h3>", unsafe_allow_html=True)
     
     col_input1, col_input2 = st.columns(2)
-    img_file_buffer = None
     
     with col_input1:
         st.info(f"📂 {t['upload_btn']}")
@@ -374,7 +382,6 @@ with tab2:
         
         # 显示预览图
         st.image(image, caption="Preview", use_container_width=True)
-        
         st.markdown("<br>", unsafe_allow_html=True)
         
         # 识别按钮
@@ -383,8 +390,7 @@ with tab2:
                 st.error("Model not loaded correctly.")
             else:
                 with st.spinner("AI analyzing..."):
-                    # 模拟一点延迟增加体验感
-                    time.sleep(0.8)
+                    time.sleep(0.8) # 模拟延迟
                     
                     # === 调用核心分类函数 ===
                     label, confidence = classify_image(image)
@@ -392,7 +398,6 @@ with tab2:
                     
                     cat_info = CATEGORY_INFO.get(label, CATEGORY_INFO["unknown"])
                     
-                    # 只有当不是 unknown 时才加分
                     points_earned = 0
                     if label != "unknown":
                         points_earned = cat_info["points"]
@@ -401,7 +406,7 @@ with tab2:
                         # 记录历史
                         st.session_state.history.insert(0, {
                             "label": cat_info["name"][st.session_state.lang],
-                            "label_key": label, # 存储原始key方便后续统计
+                            "label_key": label,
                             "points": points_earned,
                             "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "confidence": confidence
@@ -432,7 +437,7 @@ with tab2:
                         st.info(t['low_conf'])
 
 # ==================================================
-# Tab 3: 统计
+# Tab 3: 统计页面
 # ==================================================
 with tab3:
     if not st.session_state.history:
@@ -449,16 +454,11 @@ with tab3:
         # 环形图：分类占比
         st.markdown(f"#### {t['category_dist']}")
         
-        # 统计逻辑优化
         counts = {}
         for h in st.session_state.history:
-            # 兼容旧数据（如果有）和新数据
-            key = h.get("label_key", "trash") 
-            # 如果是旧数据只有 label 中文名，这里简化处理，实际生产建议统一数据结构
-            # 这里简单统计出现的次数
+            key = h.get("label_key", "trash")
             counts[key] = counts.get(key, 0) + 1
 
-        # 映射回颜色和名字
         labels_display = []
         values = []
         colors = []
@@ -497,21 +497,19 @@ with tab3:
                 """, unsafe_allow_html=True)
 
 # ==================================================
-# Tab 4: 个人中心
+# Tab 4: 个人资料
 # ==================================================
 with tab4:
-    # 个人信息卡片
     st.markdown(f"""
     <div style='text-align:center;padding:30px;
     background:linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
     border-radius:20px;color:white;margin-bottom:30px;'>
         <div style='font-size:4rem;margin-bottom:10px;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.2));'>😎</div>
         <h2 style='color:white;margin:0;'>{st.session_state.username}</h2>
-        <p style='opacity:0.9;'>ID: 8829103</p>
+        <p style='opacity:0.9;'>User ID: 8829103</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # 设置区域
     st.markdown(f"#### ⚙️ {t['username']}")
     new_name = st.text_input("Edit Username", value=st.session_state.username, label_visibility="collapsed")
     if new_name != st.session_state.username:
@@ -521,7 +519,6 @@ with tab4:
 
     st.markdown("---")
     
-    # 勋章墙
     st.markdown("#### 🏆 Badges")
     b1, b2, b3 = st.columns(3)
     
