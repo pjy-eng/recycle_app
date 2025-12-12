@@ -36,9 +36,9 @@ TRANS = {
         "history": "记录",
         "hero_title": "垃圾识别，从一张照片开始",
         "hero_sub": "拍照 → AI识别 → 正确分类 → 获得积分",
-        "cta": "👉 立即开始识别",
-        "hint": "⬆️ 请点击顶部【开始识别】标签",
-        "upload": "上传或拍摄垃圾照片",
+        "upload": "选择识别方式",
+        "upload_tab": "📂 上传图片",
+        "camera_tab": "📷 拍照",
         "start": "AI 识别",
         "analyzing": "AI 正在分析中…",
         "result": "识别结果",
@@ -52,9 +52,9 @@ TRANS = {
         "history": "History",
         "hero_title": "Recycle smarter with one photo",
         "hero_sub": "Photo → AI → Learn → Earn points",
-        "cta": "👉 Start Scanning",
-        "hint": "⬆️ Click the top [Scan] tab",
-        "upload": "Upload or take a photo",
+        "upload": "Choose input method",
+        "upload_tab": "📂 Upload",
+        "camera_tab": "📷 Camera",
         "start": "AI Scan",
         "analyzing": "AI is analyzing…",
         "result": "Result",
@@ -68,9 +68,9 @@ TRANS = {
         "history": "기록",
         "hero_title": "사진 한 장으로 쓰레기 분류",
         "hero_sub": "촬영 → AI 인식 → 분리배출 → 포인트 획득",
-        "cta": "👉 스캔 시작",
-        "hint": "⬆️ 상단 [AI 인식] 탭을 눌러주세요",
-        "upload": "쓰레기 사진 업로드",
+        "upload": "입력 방식 선택",
+        "upload_tab": "📂 이미지 업로드",
+        "camera_tab": "📷 카메라 촬영",
         "start": "AI 인식",
         "analyzing": "AI 분석 중…",
         "result": "인식 결과",
@@ -93,7 +93,7 @@ def load_model():
 processor, model = load_model()
 
 # ==================================================
-# 5. 模型 label → 多语言 UI 映射
+# 5. label → UI 映射
 # ==================================================
 LABEL_UI = {
     "plastic": {
@@ -164,8 +164,8 @@ with st.sidebar:
         ["zh", "en", "kr"],
         format_func=lambda x: {"zh": "🇨🇳 中文", "en": "🇺🇸 English", "kr": "🇰🇷 한국어"}[x]
     )
-    t = TRANS[lang]
     st.metric("⭐ Points", st.session_state.total_points)
+    t = TRANS[lang]
 
 # ==================================================
 # 8. 顶部导航
@@ -183,20 +183,29 @@ with tab_home:
     <p style="font-size:1.4rem;">{t['hero_sub']}</p>
     """, unsafe_allow_html=True)
 
-    st.button(t["cta"])
-    st.info(t["hint"])
-
 # ==================================================
-# 10. 识别页
+# 10. 识别页（上传 + 拍照）
 # ==================================================
 with tab_scan:
     st.markdown(f"## 📸 {t['upload']}")
 
-    file = st.file_uploader("", type=["jpg", "png", "jpeg"])
-    if file:
-        img = Image.open(file)
-        st.image(img, width=320)
+    up_tab, cam_tab = st.tabs([t["upload_tab"], t["camera_tab"]])
 
+    img = None
+
+    with up_tab:
+        file = st.file_uploader("", type=["jpg", "png", "jpeg"])
+        if file:
+            img = Image.open(file)
+            st.image(img, width=320)
+
+    with cam_tab:
+        cam = st.camera_input("")
+        if cam:
+            img = Image.open(cam)
+            st.image(img, width=320)
+
+    if img:
         if st.button(t["start"], use_container_width=True):
             with st.spinner(t["analyzing"]):
                 time.sleep(1)
@@ -209,8 +218,7 @@ with tab_scan:
                 "icon": icon,
                 "color": color,
                 "points": points,
-                "score": score,
-                "key": key
+                "score": score
             }
 
             st.session_state.history.insert(0, {
