@@ -109,7 +109,7 @@ st.markdown("""
         border-radius: 10px;
     }
     
-    /* 图片预览 */
+    /* 图片预览 - 调整间距 */
     .stImage {margin: 0;}
     
     /* 输入框 */
@@ -518,6 +518,7 @@ def render_navbar(t):
             options=list(lang_options.keys()),
             format_func=lambda x: lang_options[x],
             index=list(lang_options.keys()).index(st.session_state.lang),
+            key="lang_selector",
             label_visibility="collapsed"
         )
         if selected_lang != st.session_state.lang:
@@ -685,7 +686,14 @@ def main():
             
         if img_file_buffer:
             image = Image.open(img_file_buffer).convert("RGB")
-            st.image(image, use_container_width=True)
+            
+            # --- 修改开始：使用三列布局让图片居中且变小 ---
+            # 中间列占2份，两边各1份，这样图片大约占50%宽
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c2:
+                st.image(image, use_container_width=True)
+            # --- 修改结束 ---
+            
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button(f"⚡ {t['instant_scan']}", use_container_width=True, type="primary", key="scan_btn"):
