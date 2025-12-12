@@ -4,5 +4,3 @@ torchvision
 transformers
 Pillow
 plotly
-requests
-streamlit-lottie
