@@ -3,217 +3,223 @@ import time
 from PIL import Image
 from datetime import datetime
 import plotly.express as px
+import torch
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 
-# =============================
+# ==================================================
 # 1. 页面配置
-# =============================
+# ==================================================
 st.set_page_config(
     page_title="SmartRecycle",
     page_icon="♻️",
     layout="wide"
 )
 
-# =============================
+# ==================================================
 # 2. Session State
-# =============================
-if "points" not in st.session_state:
-    st.session_state.points = 0
-
+# ==================================================
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "last_result" not in st.session_state:
-    st.session_state.last_result = None
+if "total_points" not in st.session_state:
+    st.session_state.total_points = 0
 
-# =============================
-# 3. 多语言配置（中 / 英 / 韩）
-# =============================
+if "last_res" not in st.session_state:
+    st.session_state.last_res = None
+
+# ==================================================
+# 3. 多语言
+# ==================================================
 TRANS = {
     "zh": {
-        "home_title": "垃圾识别，从一张照片开始",
-        "home_sub": "拍照 → AI识别 → 学会正确分类 → 获得积分",
+        "home": "系统主页",
+        "scan": "智能识别",
+        "data": "数据看板",
+        "history": "历史记录",
+        "upload": "上传图片",
         "start": "开始识别",
-        "scan_title": "上传或拍摄垃圾照片",
-        "scan_btn": "🔍 AI 识别",
         "analyzing": "AI 正在分析中…",
-        "result": "识别结果",
+        "result": "AI 建议分类",
         "points": "获得积分",
-        "preview": "图片预览",
-        "data_title": "我的数据",
-        "history_title": "识别记录",
-        "most_type": "我最常识别的垃圾",
+        "welcome": "拍照即可识别垃圾类别，帮助你正确分类并获得积分。",
     },
     "en": {
-        "home_title": "Recycle smarter with one photo",
-        "home_sub": "Photo → AI → Learn → Earn points",
-        "start": "Start Scanning",
-        "scan_title": "Upload or take a photo",
-        "scan_btn": "🔍 AI Scan",
+        "home": "Home",
+        "scan": "AI Scan",
+        "data": "Analytics",
+        "history": "History",
+        "upload": "Upload Image",
+        "start": "Start Scan",
         "analyzing": "AI is analyzing…",
-        "result": "Result",
+        "result": "AI Suggested Category",
         "points": "Points Earned",
-        "preview": "Image Preview",
-        "data_title": "My Statistics",
-        "history_title": "History",
-        "most_type": "Most scanned waste type",
+        "welcome": "Take a photo to identify waste and earn points.",
     },
     "kr": {
-        "home_title": "사진 한 장으로 쓰레기 분류",
-        "home_sub": "촬영 → AI 인식 → 올바른 분리배출 → 포인트 획득",
+        "home": "홈",
+        "scan": "AI 인식",
+        "data": "데이터",
+        "history": "기록",
+        "upload": "이미지 업로드",
         "start": "스캔 시작",
-        "scan_title": "쓰레기 사진을 업로드하세요",
-        "scan_btn": "🔍 AI 인식",
         "analyzing": "AI 분석 중…",
-        "result": "인식 결과",
+        "result": "AI 분류 제안",
         "points": "획득 포인트",
-        "preview": "이미지 미리보기",
-        "data_title": "나의 데이터",
-        "history_title": "기록",
-        "most_type": "가장 많이 인식한 쓰레기",
+        "welcome": "사진을 찍어 쓰레기를 분류하고 포인트를 받으세요.",
     }
 }
 
-# =============================
-# 4. 侧边栏（语言 + 积分）
-# =============================
+# ==================================================
+# 4. 加载垃圾分类模型（方案 A）
+# ==================================================
+@st.cache_resource
+def load_garbage_model():
+    processor = AutoImageProcessor.from_pretrained("nateraw/garbage-classifier")
+    model = AutoModelForImageClassification.from_pretrained("nateraw/garbage-classifier")
+    model.eval()
+    return processor, model
+
+processor, model = load_garbage_model()
+
+# ==================================================
+# 5. 垃圾分类函数（高准确度）
+# ==================================================
+def classify_waste(image, lang):
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    inputs = processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    probs = torch.softmax(outputs.logits, dim=-1)
+    score, pred_id = torch.max(probs, dim=-1)
+
+    score = score.item()
+    key = model.config.id2label[pred_id.item()]  # plastic / paper / metal ...
+
+    # 置信度阈值
+    if score < 0.35:
+        key = "unknown"
+
+    WASTE_INFO = {
+        "plastic": {
+            "zh": ("塑料", "清洗后放入塑料回收桶", 10, "🥤"),
+            "en": ("Plastic", "Clean and recycle as plastic", 10, "🥤"),
+            "kr": ("플라스틱", "세척 후 플라스틱 수거함", 10, "🥤")
+        },
+        "paper": {
+            "zh": ("纸类", "保持干燥后作为纸类回收", 5, "📰"),
+            "en": ("Paper", "Keep dry and recycle as paper", 5, "📰"),
+            "kr": ("종이", "물기 제거 후 종이 수거함", 5, "📰")
+        },
+        "metal": {
+            "zh": ("金属", "压扁后放入金属回收桶", 15, "🥫"),
+            "en": ("Metal", "Crush and recycle as metal", 15, "🥫"),
+            "kr": ("금속", "압축 후 금속 수거함", 15, "🥫")
+        },
+        "glass": {
+            "zh": ("玻璃", "小心放入玻璃回收桶", 10, "🍾"),
+            "en": ("Glass", "Handle carefully and recycle as glass", 10, "🍾"),
+            "kr": ("유리", "깨지지 않게 유리 수거함", 10, "🍾")
+        },
+        "cardboard": {
+            "zh": ("纸板", "压平后作为纸类回收", 5, "📦"),
+            "en": ("Cardboard", "Flatten and recycle as paper", 5, "📦"),
+            "kr": ("골판지", "펴서 종이류로 배출", 5, "📦")
+        },
+        "trash": {
+            "zh": ("一般垃圾", "作为一般垃圾处理", 1, "🗑️"),
+            "en": ("Trash", "Dispose as general waste", 1, "🗑️"),
+            "kr": ("일반 쓰레기", "종량제 봉투 배출", 1, "🗑️")
+        },
+        "unknown": {
+            "zh": ("无法识别", "图片不清晰，请人工判断", 0, "❓"),
+            "en": ("Uncertain", "Low confidence, please classify manually", 0, "❓"),
+            "kr": ("인식 불가", "확신 부족, 직접 분류해주세요", 0, "❓")
+        }
+    }
+
+    label, advice, points, icon = WASTE_INFO[key][lang]
+    return label, advice, points, score, icon
+
+# ==================================================
+# 6. 侧边栏
+# ==================================================
 with st.sidebar:
     lang = st.selectbox(
         "Language / 언어",
-        options=["zh", "en", "kr"],
-        format_func=lambda x: {
-            "zh": "🇨🇳 中文",
-            "en": "🇺🇸 English",
-            "kr": "🇰🇷 한국어"
-        }[x]
+        ["zh", "en", "kr"],
+        format_func=lambda x: {"zh": "🇨🇳 中文", "en": "🇺🇸 English", "kr": "🇰🇷 한국어"}[x]
     )
     t = TRANS[lang]
 
     st.markdown("---")
-    st.metric("⭐ Points", st.session_state.points)
+    st.metric("⭐ Points", st.session_state.total_points)
 
-# =============================
-# 5. 顶部导航
-# =============================
-tab_home, tab_scan, tab_data, tab_history = st.tabs(
-    ["🏠 Home", "📸 Scan", "📊 Data", "📜 History"]
-)
-
-# =============================
-# 6. 首页
-# =============================
-with tab_home:
-    col1, col2 = st.columns([3, 2])
-
-    with col1:
-        st.markdown(
-            f"""
-            <h1 style="font-size:3rem;">♻️ {t['home_title']}</h1>
-            <p style="font-size:1.3rem; opacity:0.8;">{t['home_sub']}</p>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.info("👉 " + t["scan_title"])
-        st.button(t["start"], type="primary", use_container_width=True)
-
-    with col2:
-        st.markdown("### 🌱")
-        st.write("Make recycling easier and smarter.")
-
-# =============================
-# 7. AI 识别页（核心）
-# =============================
-with tab_scan:
-    st.markdown(f"## 📸 {t['scan_title']}")
-
-    img_file = st.file_uploader(
-        "",
-        type=["jpg", "png", "jpeg"],
-        help=t["scan_title"]
+    page = st.radio(
+        "Navigation",
+        [t["home"], t["scan"], t["data"], t["history"]],
+        label_visibility="collapsed"
     )
 
-    if img_file:
-        img = Image.open(img_file)
-        st.image(img, width=320, caption=t["preview"])
+# ==================================================
+# 7. 页面逻辑
+# ==================================================
+if page == t["home"]:
+    st.title("♻️ SmartRecycle")
+    st.info(t["welcome"])
 
-        if st.button(t["scan_btn"], use_container_width=True):
+elif page == t["scan"]:
+    st.title(f"📸 {t['scan']}")
+    file = st.file_uploader(t["upload"], type=["jpg", "png", "jpeg"])
+
+    if file:
+        img = Image.open(file)
+        st.image(img, width=320)
+
+        if st.button(t["start"], use_container_width=True):
             with st.spinner(t["analyzing"]):
                 time.sleep(1)
 
-            # ====== 模拟识别结果（你可以换成真实模型） ======
-            label = {
-                "zh": "塑料瓶",
-                "en": "Plastic Bottle",
-                "kr": "플라스틱 병"
-            }[lang]
+            label, advice, points, score, icon = classify_waste(img, lang)
 
-            advice = {
-                "zh": "请清洗后放入塑料回收桶",
-                "en": "Please clean and put it into the plastic recycling bin",
-                "kr": "세척 후 플라스틱 수거함에 버려주세요"
-            }[lang]
-
-            points = 10
-
-            # 保存结果
-            st.session_state.last_result = {
+            st.session_state.total_points += points
+            st.session_state.last_res = {
                 "label": label,
                 "advice": advice,
-                "points": points
+                "points": points,
+                "score": score,
+                "icon": icon
             }
-
-            st.session_state.points += points
-            st.session_state.history.append({
-                "time": datetime.now().strftime("%H:%M"),
+            st.session_state.history.insert(0, {
                 "label": label,
-                "points": points
+                "points": points,
+                "time": datetime.now().strftime("%H:%M")
             })
 
-            st.balloons()
-            st.toast(f"🎉 +{points}")
-
-    # ====== 结果展示（关键闭环） ======
-    if st.session_state.last_result:
-        res = st.session_state.last_result
-        st.markdown("---")
-        st.markdown(f"### ✅ {t['result']}")
-        st.success(res["label"])
+    if st.session_state.last_res:
+        res = st.session_state.last_res
+        st.divider()
+        st.subheader(t["result"])
+        st.success(f"{res['icon']} {res['label']}")
         st.info(res["advice"])
         st.metric(t["points"], f"+{res['points']}")
 
-# =============================
-# 8. 数据页
-# =============================
-with tab_data:
-    st.markdown(f"## 📊 {t['data_title']}")
+elif page == t["data"]:
+    st.title(f"📊 {t['data']}")
 
     if st.session_state.history:
         counter = {}
         for h in st.session_state.history:
             counter[h["label"]] = counter.get(h["label"], 0) + 1
 
-        fig = px.pie(
-            names=counter.keys(),
-            values=counter.values(),
-            hole=0.4
-        )
+        fig = px.pie(names=counter.keys(), values=counter.values(), hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
-
-        most = max(counter, key=counter.get)
-        st.success(f"{t['most_type']}：{most}")
     else:
         st.info("No data yet.")
 
-# =============================
-# 9. 历史记录
-# =============================
-with tab_history:
-    st.markdown(f"## 📜 {t['history_title']}")
-
-    if not st.session_state.history:
-        st.info("No history.")
-    else:
-        for h in reversed(st.session_state.history):
-            st.markdown(
-                f"- **{h['label']}** ｜ +{h['points']} ｜ {h['time']}"
-            )
+elif page == t["history"]:
+    st.title(f"📜 {t['history']}")
+    for h in st.session_state.history:
+        st.markdown(f"- **{h['label']}** ｜ +{h['points']} ｜ {h['time']}")
