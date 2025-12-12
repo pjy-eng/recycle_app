@@ -8,7 +8,7 @@ from transformers import CLIPProcessor, CLIPModel
 import random
 
 # ==================================================
-# 1. 页面配置 (必须在所有其他 st 命令之前)
+# 1. 页面配置 (必须在最前面)
 # ==================================================
 st.set_page_config(
     page_title="EcoScan AI",
@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ==================================================
-# 2. 全局样式 (CSS)
+# 2. 全局样式 (CSS) - 包含 Radio 模拟 Tab 的样式
 # ==================================================
 st.markdown("""
 <style>
@@ -40,33 +40,50 @@ st.markdown("""
         padding: 12px 0;
         margin-bottom: 0;
     }
-    
-    /* Tab 样式 - 极简现代 */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0;
+
+    /* =========================================
+       自定义导航条 (模拟 Tabs)
+       ========================================= */
+    div[role="radiogroup"] {
+        display: flex;
+        justify-content: center;
         background: transparent;
         border-bottom: 2px solid #f1f5f9;
-        justify-content: center;
+        padding-bottom: 0;
+        width: 100%;
+        margin-bottom: 20px;
     }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        padding: 0 32px;
-        background: transparent;
+    div[role="radiogroup"] > div {
+        display: flex;
+        gap: 0;
+        width: auto;
+    }
+    div[role="radiogroup"] label {
+        background: transparent !important;
         border: none;
+        padding: 10px 32px;
+        border-radius: 0;
+        transition: all 0.2s;
+        margin: 0;
         color: #94a3b8;
         font-weight: 500;
         font-size: 15px;
-        transition: all 0.2s;
+        cursor: pointer;
     }
-    .stTabs [data-baseweb="tab"]:hover {
+    /* 选中状态 */
+    div[role="radiogroup"] label[data-checked="true"] {
+        border-bottom: 3px solid #10b981 !important;
+        color: #10b981 !important;
+        font-weight: bold;
+    }
+    div[role="radiogroup"] label:hover {
         color: #10b981;
     }
-    .stTabs [aria-selected="true"] {
-        color: #10b981;
-        border-bottom: 3px solid #10b981;
-        background: transparent;
+    /* 隐藏单选圆圈 */
+    div[role="radiogroup"] label > div:first-child {
+        display: none;
     }
-    
+
     /* 按钮优化 */
     .stButton > button {
         border-radius: 12px;
@@ -78,19 +95,6 @@ st.markdown("""
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
-    }
-    
-    /* 卡片样式 */
-    .card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border: 1px solid #f1f5f9;
-        transition: all 0.3s;
-    }
-    .card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
     
     /* 度量指标美化 */
@@ -128,14 +132,15 @@ def init_session_state():
         "history": [],
         "total_points": 0,
         "username": "EcoWarrior",
-        "lang": "zh", # 默认中文
+        "lang": "zh", 
         "first_visit": True,
         "streak_days": 0,
         "last_scan_date": None,
-        "total_co2_saved": 0,  # kg CO2
+        "total_co2_saved": 0,
         "achievements": [],
-        "scan_mode": "instant",  # instant / batch
+        "scan_mode": "instant",
         "onboarding_done": False,
+        "current_tab": None, # 新增：控制当前Tab
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -192,9 +197,6 @@ TRANSLATIONS = {
         "username": "用户昵称",
         "language": "语言",
         "save_changes": "保存更改",
-        "scan_history": "扫描历史",
-        "clear_history": "清空历史",
-        "export_data": "导出数据",
         "badge_beginner": "入门者",
         "badge_explorer": "探索者",
         "badge_expert": "专家",
@@ -257,9 +259,6 @@ TRANSLATIONS = {
         "username": "Username",
         "language": "Language",
         "save_changes": "Save Changes",
-        "scan_history": "Scan History",
-        "clear_history": "Clear History",
-        "export_data": "Export Data",
         "badge_beginner": "Beginner",
         "badge_explorer": "Explorer",
         "badge_expert": "Expert",
@@ -322,9 +321,6 @@ TRANSLATIONS = {
         "username": "사용자 이름",
         "language": "언어",
         "save_changes": "변경사항 저장",
-        "scan_history": "스캔 기록",
-        "clear_history": "기록 지우기",
-        "export_data": "데이터 내보내기",
         "badge_beginner": "초보자",
         "badge_explorer": "탐험가",
         "badge_expert": "전문가",
@@ -354,10 +350,7 @@ CATEGORIES = {
         "color": "#10b981",
         "points": 10,
         "co2_kg": 0.5,
-        "prompts": [
-            "a clear photo of plastic bottle, plastic container, or plastic packaging",
-            "plastic waste like water bottle, plastic bag, or food container",
-        ]
+        "prompts": ["plastic bottle", "plastic container", "plastic waste"]
     },
     "paper": {
         "name": {"zh": "纸张", "en": "Paper", "kr": "종이"},
@@ -365,10 +358,7 @@ CATEGORIES = {
         "color": "#f59e0b",
         "points": 5,
         "co2_kg": 0.3,
-        "prompts": [
-            "a photo of paper waste, newspaper, document, or white paper",
-            "paper products like office paper, magazine, or book pages",
-        ]
+        "prompts": ["paper waste", "newspaper", "white paper"]
     },
     "cardboard": {
         "name": {"zh": "纸板", "en": "Cardboard", "kr": "골판지"},
@@ -376,10 +366,7 @@ CATEGORIES = {
         "color": "#d97706",
         "points": 8,
         "co2_kg": 0.4,
-        "prompts": [
-            "a photo of cardboard box, brown packaging box, or corrugated cardboard",
-            "cardboard waste like shipping box, pizza box, or package material",
-        ]
+        "prompts": ["cardboard box", "cardboard waste"]
     },
     "metal": {
         "name": {"zh": "金属", "en": "Metal", "kr": "금속"},
@@ -387,10 +374,7 @@ CATEGORIES = {
         "color": "#3b82f6",
         "points": 15,
         "co2_kg": 0.8,
-        "prompts": [
-            "a photo of metal can, aluminum can, tin can, or metal container",
-            "metal waste like soda can, food can, or metal packaging",
-        ]
+        "prompts": ["metal can", "aluminum can", "tin can"]
     },
     "glass": {
         "name": {"zh": "玻璃", "en": "Glass", "kr": "유리"},
@@ -398,10 +382,7 @@ CATEGORIES = {
         "color": "#a855f7",
         "points": 12,
         "co2_kg": 0.6,
-        "prompts": [
-            "a photo of glass bottle, glass jar, or clear glass container",
-            "glass waste like wine bottle, jar, or broken glass pieces",
-        ]
+        "prompts": ["glass bottle", "glass jar"]
     },
     "trash": {
         "name": {"zh": "一般垃圾", "en": "General Trash", "kr": "일반쓰레기"},
@@ -409,10 +390,7 @@ CATEGORIES = {
         "color": "#64748b",
         "points": 2,
         "co2_kg": 0.1,
-        "prompts": [
-            "a photo of general trash, food waste, or non-recyclable items",
-            "mixed waste like dirty napkins, food scraps, or unrecyclable materials",
-        ]
+        "prompts": ["general trash", "food waste", "garbage"]
     },
 }
 
@@ -434,35 +412,23 @@ def load_clip_model():
 processor, model = load_clip_model()
 
 def preprocess_image(image):
-    """增强图像质量"""
-    # 调整大小
     image = image.resize((384, 384), Image.Resampling.LANCZOS)
-    
-    # 自动对比度增强
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(1.2)
-    
-    # 锐化
     image = image.filter(ImageFilter.SHARPEN)
     return image
 
 def classify_image(image):
-    """使用 CLIP 进行零样本分类"""
     if not processor or not model:
-        # 如果模型未加载，模拟返回一般垃圾
         return "trash", 0.0
     
-    # 预处理
     processed_image = preprocess_image(image)
     
-    # 构建提示词
     category_keys = list(CATEGORIES.keys())
     prompts = []
     for key in category_keys:
-        # 随机选择一个提示词变体
-        prompts.append(random.choice(CATEGORIES[key]["prompts"]))
+        prompts.append(f"a photo of {random.choice(CATEGORIES[key]['prompts'])}")
     
-    # 模型推理
     inputs = processor(
         text=prompts,
         images=processed_image,
@@ -480,69 +446,46 @@ def classify_image(image):
     predicted_category = category_keys[idx.item()]
     confidence_value = confidence.item()
     
-    # 阈值判断
     if confidence_value < 0.35:
         return "trash", confidence_value
     
     return predicted_category, confidence_value
 
 # ==================================================
-# 7. 业务逻辑函数 (分数, 成就, 等级)
+# 7. 业务逻辑函数
 # ==================================================
 def update_streak():
-    """更新连续扫描天数"""
     today = datetime.now().date()
-    
     if st.session_state.last_scan_date is None:
         st.session_state.streak_days = 1
     else:
         last_date = st.session_state.last_scan_date
         days_diff = (today - last_date).days
-        
-        if days_diff == 0:
-            # 同一天，不增加
-            pass
-        elif days_diff == 1:
-            # 连续
+        if days_diff == 1:
             st.session_state.streak_days += 1
-        else:
-            # 中断
+        elif days_diff > 1:
             st.session_state.streak_days = 1
-    
     st.session_state.last_scan_date = today
 
 def check_achievements():
-    """检查并解锁成就"""
     points = st.session_state.total_points
     scans = len(st.session_state.history)
     streak = st.session_state.streak_days
-    
     achievements = st.session_state.achievements
     
-    # 扫描次数成就
-    if scans >= 1 and "beginner" not in achievements:
-        achievements.append("beginner")
-    if scans >= 10 and "explorer" not in achievements:
-        achievements.append("explorer")
-    if scans >= 50 and "expert" not in achievements:
-        achievements.append("expert")
-    if scans >= 100 and "master" not in achievements:
-        achievements.append("master")
-    if scans >= 500 and "legend" not in achievements:
-        achievements.append("legend")
+    if scans >= 1 and "beginner" not in achievements: achievements.append("beginner")
+    if scans >= 10 and "explorer" not in achievements: achievements.append("explorer")
+    if scans >= 50 and "expert" not in achievements: achievements.append("expert")
+    if scans >= 100 and "master" not in achievements: achievements.append("master")
+    if scans >= 500 and "legend" not in achievements: achievements.append("legend")
+    if streak >= 7 and "streak" not in achievements: achievements.append("streak")
     
-    # 连续天数成就
-    if streak >= 7 and "streak" not in achievements:
-        achievements.append("streak")
-    
-    # 多样性成就（至少扫描过4种类别）
     if st.session_state.history:
         unique_categories = set([h["category"] for h in st.session_state.history])
         if len(unique_categories) >= 4 and "variety" not in achievements:
             achievements.append("variety")
 
 def add_scan_record(category, confidence, points, co2):
-    """添加扫描记录"""
     record = {
         "category": category,
         "confidence": confidence,
@@ -558,26 +501,18 @@ def add_scan_record(category, confidence, points, co2):
     check_achievements()
 
 def get_level():
-    """计算用户等级"""
     return st.session_state.total_points // 100 + 1
 
 def get_level_progress():
-    """等级进度百分比"""
     return (st.session_state.total_points % 100) / 100
 
 # ==================================================
 # 8. UI 组件
 # ==================================================
 def render_navbar(t):
-    """顶部导航栏"""
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col1:
-        lang_options = {
-            "zh": "🇨🇳 中文",
-            "en": "🇺🇸 English",
-            "kr": "🇰🇷 한국어"
-        }
+        lang_options = {"zh": "🇨🇳 中文", "en": "🇺🇸 English", "kr": "🇰🇷 한국어"}
         selected_lang = st.selectbox(
             "Language",
             options=list(lang_options.keys()),
@@ -588,7 +523,6 @@ def render_navbar(t):
         if selected_lang != st.session_state.lang:
             st.session_state.lang = selected_lang
             st.rerun()
-    
     with col2:
         st.markdown(
             f"<div style='text-align:center;'>"
@@ -597,7 +531,6 @@ def render_navbar(t):
             f"</div>",
             unsafe_allow_html=True
         )
-    
     with col3:
         level = get_level()
         st.markdown(
@@ -608,42 +541,22 @@ def render_navbar(t):
             f"</div>",
             unsafe_allow_html=True
         )
-    
     st.markdown("<br>", unsafe_allow_html=True)
 
 def render_onboarding(t):
-    """首次访问引导"""
     if not st.session_state.onboarding_done:
         st.markdown(
-            f"<div style='background:linear-gradient(135deg,#d1fae5,#a7f3d0);"
-            f"padding:60px 40px;border-radius:24px;text-align:center;margin-bottom:30px;'>"
+            f"<div style='background:linear-gradient(135deg,#d1fae5,#a7f3d0);padding:60px 40px;border-radius:24px;text-align:center;margin-bottom:30px;'>"
             f"<h1 style='color:#065f46;margin-bottom:20px;'>{t['welcome_title']}</h1>"
             f"<p style='font-size:1.3rem;color:#047857;margin-bottom:40px;'>{t['welcome_msg']}</p>"
-            f"</div>",
-            unsafe_allow_html=True
+            f"</div>", unsafe_allow_html=True
         )
-        
         col1, col2, col3 = st.columns(3)
-        
-        steps = [
-            ("📸", t['onboard_step1']),
-            ("🤖", t['onboard_step2']),
-            ("🎁", t['onboard_step3']),
-        ]
-        
+        steps = [("📸", t['onboard_step1']), ("🤖", t['onboard_step2']), ("🎁", t['onboard_step3'])]
         for col, (icon, text) in zip([col1, col2, col3], steps):
             with col:
-                st.markdown(
-                    f"<div style='text-align:center;padding:30px;background:white;"
-                    f"border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);'>"
-                    f"<div style='font-size:3.5rem;margin-bottom:15px;'>{icon}</div>"
-                    f"<p style='font-size:1.1rem;color:#334155;font-weight:500;'>{text}</p>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-        
+                st.markdown(f"<div style='text-align:center;padding:30px;background:white;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);'><div style='font-size:3.5rem;margin-bottom:15px;'>{icon}</div><p style='font-size:1.1rem;color:#334155;font-weight:500;'>{text}</p></div>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        
         col_skip, col_start = st.columns(2)
         with col_skip:
             if st.button(t['skip'], use_container_width=True):
@@ -653,13 +566,10 @@ def render_onboarding(t):
             if st.button(t['start'], use_container_width=True, type="primary"):
                 st.session_state.onboarding_done = True
                 st.rerun()
-        
         return True
-    
     return False
 
 def render_scan_result(t, category, confidence, image):
-    """渲染扫描结果卡片"""
     cat_info = CATEGORIES[category]
     name = cat_info["name"][st.session_state.lang]
     icon = cat_info["icon"]
@@ -667,225 +577,139 @@ def render_scan_result(t, category, confidence, image):
     points = cat_info["points"]
     co2 = cat_info["co2_kg"]
     
-    # 成功动画
     st.balloons()
-    
-    # 结果展示
     st.markdown(
-        f"<div style='background:linear-gradient(135deg,{color}15,{color}05);"
-        f"border:3px solid {color};border-radius:24px;padding:40px;text-align:center;"
-        f"margin:30px 0;box-shadow:0 10px 40px {color}30;'>"
+        f"<div style='background:linear-gradient(135deg,{color}15,{color}05);border:3px solid {color};border-radius:24px;padding:40px;text-align:center;margin:30px 0;box-shadow:0 10px 40px {color}30;'>"
         f"<div style='font-size:6rem;margin-bottom:20px;'>{icon}</div>"
         f"<h2 style='color:{color};font-size:2.5rem;margin:15px 0;'>{name}</h2>"
         f"<div style='display:flex;justify-content:center;gap:40px;margin:30px 0;'>"
-        f"<div><span style='color:#64748b;'>🎯 {t['confidence']}</span><br>"
-        f"<span style='font-size:1.8rem;font-weight:700;color:{color};'>{confidence:.0%}</span></div>"
-        f"<div><span style='color:#64748b;'>⭐ {t['earned_points']}</span><br>"
-        f"<span style='font-size:1.8rem;font-weight:700;color:{color};'>+{points}</span></div>"
-        f"<div><span style='color:#64748b;'>🌍 {t['co2_saved']}</span><br>"
-        f"<span style='font-size:1.8rem;font-weight:700;color:{color};'>{co2:.1f}kg</span></div>"
-        f"</div></div>",
-        unsafe_allow_html=True
+        f"<div><span style='color:#64748b;'>🎯 {t['confidence']}</span><br><span style='font-size:1.8rem;font-weight:700;color:{color};'>{confidence:.0%}</span></div>"
+        f"<div><span style='color:#64748b;'>⭐ {t['earned_points']}</span><br><span style='font-size:1.8rem;font-weight:700;color:{color};'>+{points}</span></div>"
+        f"<div><span style='color:#64748b;'>🌍 {t['co2_saved']}</span><br><span style='font-size:1.8rem;font-weight:700;color:{color};'>{co2:.1f}kg</span></div>"
+        f"</div></div>", unsafe_allow_html=True
     )
     
-    # 低置信度处理
     if confidence < 0.6:
         with st.expander(f"⚠️ {t['low_confidence_title']}", expanded=True):
             st.warning(t['low_confidence_msg'])
             st.markdown(f"- {t['tip_lighting']}")
             st.markdown(f"- {t['tip_focus']}")
             st.markdown(f"- {t['tip_distance']}")
-            
-            st.markdown(f"**{t['help_us_learn']}**")
-            correct_cat = st.selectbox(
-                t['correct_category'],
-                options=list(CATEGORIES.keys()),
-                format_func=lambda x: CATEGORIES[x]["name"][st.session_state.lang],
-                key="feedback_category"
-            )
-            
-            if st.button(t['submit_feedback'], key="submit_feedback"):
-                st.success(t['thanks_feedback'])
-                # 这里可以将反馈数据存储到数据库
 
-    # 操作按钮
     col1, col2 = st.columns(2)
     with col1:
         if st.button(f"📸 {t['scan_another']}", use_container_width=True):
-            st.session_state.pop('current_image', None) # 清除当前图片
+            st.session_state.pop('current_image', None)
             st.rerun()
     with col2:
         if st.button(f"📊 {t['view_history']}", use_container_width=True):
-            # 通常需要状态管理来切换Tab，这里仅作示意，实际可通过 session state 控制 tab 索引
-            st.success("请切换到“洞察”标签页查看详情")
+            # 跳转到洞察页
+            st.session_state.current_tab = TRANSLATIONS[st.session_state.lang]['nav_insights']
+            st.rerun()
 
 # ==================================================
-# 9. 主程序结构
+# 9. 主程序结构 (包含修复后的跳转逻辑)
 # ==================================================
 def main():
     t = TRANSLATIONS[st.session_state.lang]
-    
-    # 导航栏
     render_navbar(t)
+    if render_onboarding(t): return
     
-    # 首次访问引导
-    if render_onboarding(t):
-        return
+    # -----------------------------------------------
+    # 核心修改：使用 Radio + Session State 替代 st.tabs
+    # -----------------------------------------------
+    tabs_options = [t['nav_home'], t['nav_scan'], t['nav_insights'], t['nav_profile']]
     
-    # 主导航
-    tab1, tab2, tab3, tab4 = st.tabs([
-        t['nav_home'],
-        t['nav_scan'],
-        t['nav_insights'],
-        t['nav_profile']
-    ])
-    
+    # 确保 session_state 初始化
+    if st.session_state.current_tab not in tabs_options:
+        st.session_state.current_tab = tabs_options[0]
+
+    # 跳转回调函数
+    def go_to_scan_tab():
+        st.session_state.current_tab = t['nav_scan']
+
+    # 导航栏 (CSS将其样式化为Tab)
+    selected_tab = st.radio(
+        "", 
+        options=tabs_options, 
+        horizontal=True, 
+        label_visibility="collapsed",
+        key="current_tab" # 双向绑定
+    )
+
     # --- Tab 1: 首页 ---
-    with tab1:
-        # Hero Section
+    if selected_tab == t['nav_home']:
         st.markdown(
-            f"<div style='background:linear-gradient(135deg,#10b98115,#05966915);"
-            f"padding:80px 40px;border-radius:24px;text-align:center;margin-bottom:40px;'>"
+            f"<div style='background:linear-gradient(135deg,#10b98115,#05966915);padding:80px 40px;border-radius:24px;text-align:center;margin-bottom:40px;'>"
             f"<h1 style='font-size:3.5rem;color:#065f46;margin-bottom:20px;'>{t['hero_title']}</h1>"
             f"<p style='font-size:1.5rem;color:#047857;margin-bottom:40px;'>{t['hero_subtitle']}</p>"
-            f"</div>",
-            unsafe_allow_html=True
+            f"</div>", unsafe_allow_html=True
         )
         
-        # 快速统计
         col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric(t['total_scans'], len(st.session_state.history))
-        with col2:
-            st.metric(t['eco_score'], st.session_state.total_points)
-        with col3:
-            st.metric(t['current_level'], get_level())
-        with col4:
-            st.metric(f"{t['streak']} 🔥", st.session_state.streak_days)
-        
+        with col1: st.metric(t['total_scans'], len(st.session_state.history))
+        with col2: st.metric(t['eco_score'], st.session_state.total_points)
+        with col3: st.metric(t['current_level'], get_level())
+        with col4: st.metric(f"{t['streak']} 🔥", st.session_state.streak_days)
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # CTA 按钮
-        if st.button(f"📸 {t['get_started']}", use_container_width=True, type="primary"):
-            st.info("👈 请切换到「扫描」标签页开始使用")
+        # 按钮绑定回调函数，实现跳转
+        st.button(f"📸 {t['get_started']}", use_container_width=True, type="primary", on_click=go_to_scan_tab)
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # 环保影响可视化
         if st.session_state.history:
             st.markdown(f"### 🌍 {t['eco_impact']}")
-            
-            trees = st.session_state.total_co2_saved / 20  # 假设20kg CO2 = 1棵树
-            water = st.session_state.total_points * 2  # 假设1分 = 2L水
-            
+            trees = st.session_state.total_co2_saved / 20
+            water = st.session_state.total_points * 2
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown(
-                    f"<div style='background:linear-gradient(135deg,#d1fae5,#a7f3d0);"
-                    f"padding:30px;border-radius:16px;text-align:center;'>"
-                    f"<div style='font-size:3rem;'>🌳</div>"
-                    f"<h3 style='color:#065f46;'>{trees:.1f}</h3>"
-                    f"<p style='color:#047857;'>{t['trees_planted']}</p>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"<div style='background:linear-gradient(135deg,#d1fae5,#a7f3d0);padding:30px;border-radius:16px;text-align:center;'><div style='font-size:3rem;'>🌳</div><h3 style='color:#065f46;'>{trees:.1f}</h3><p style='color:#047857;'>{t['trees_planted']}</p></div>", unsafe_allow_html=True)
             with col2:
-                st.markdown(
-                    f"<div style='background:linear-gradient(135deg,#dbeafe,#bfdbfe);"
-                    f"padding:30px;border-radius:16px;text-align:center;'>"
-                    f"<div style='font-size:3rem;'>💧</div>"
-                    f"<h3 style='color:#1e40af;'>{water:.0f}L</h3>"
-                    f"<p style='color:#1e3a8a;'>{t['water_saved']}</p>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"<div style='background:linear-gradient(135deg,#dbeafe,#bfdbfe);padding:30px;border-radius:16px;text-align:center;'><div style='font-size:3rem;'>💧</div><h3 style='color:#1e40af;'>{water:.0f}L</h3><p style='color:#1e3a8a;'>{t['water_saved']}</p></div>", unsafe_allow_html=True)
 
     # --- Tab 2: 扫描页面 ---
-    with tab2:
+    elif selected_tab == t['nav_scan']:
         st.markdown(f"### 📸 {t['instant_scan']}")
-        
         col1, col2 = st.columns([1, 1])
-        
         img_file_buffer = None
         
         with col1:
             st.markdown(f"#### {t['upload_photo']}")
-            uploaded_file = st.file_uploader(
-                "upload",
-                type=["jpg", "png", "jpeg"],
-                label_visibility="collapsed"
-            )
-            if uploaded_file:
-                img_file_buffer = uploaded_file
-        
+            uploaded_file = st.file_uploader("upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="uploader")
+            if uploaded_file: img_file_buffer = uploaded_file
         with col2:
             st.markdown(f"#### {t['take_photo']}")
-            camera_photo = st.camera_input(
-                "camera",
-                label_visibility="collapsed"
-            )
-            if camera_photo:
-                img_file_buffer = camera_photo
-        
-        # 图像处理与分类
+            camera_photo = st.camera_input("camera", label_visibility="collapsed", key="camera")
+            if camera_photo: img_file_buffer = camera_photo
+            
         if img_file_buffer:
             image = Image.open(img_file_buffer).convert("RGB")
-            
-            # 预览
             st.image(image, use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 扫描按钮状态控制
-            scan_btn_key = f"scan_btn_{img_file_buffer.name if hasattr(img_file_buffer, 'name') else 'camera'}"
-            
-            if st.button(f"⚡ {t['instant_scan']}", use_container_width=True, type="primary", key=scan_btn_key):
+            if st.button(f"⚡ {t['instant_scan']}", use_container_width=True, type="primary", key="scan_btn"):
                 with st.spinner(f"🤖 {t['analyzing']}..."):
-                    time.sleep(1.0) # 模拟延迟增加体验
-                    
+                    time.sleep(1.0)
                     category, confidence = classify_image(image)
-                    
-                    # 添加记录
                     cat_info = CATEGORIES[category]
                     add_scan_record(category, confidence, cat_info["points"], cat_info["co2_kg"])
-                    
-                    # 渲染结果
                     render_scan_result(t, category, confidence, image)
 
     # --- Tab 3: 数据洞察 ---
-    with tab3:
+    elif selected_tab == t['nav_insights']:
         if not st.session_state.history:
             st.info(t['no_data'])
         else:
-            # 概览卡片
             col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    t['total_scans'],
-                    len(st.session_state.history),
-                    delta=f"+{len([h for h in st.session_state.history if h['date'] == datetime.now().strftime('%Y-%m-%d')])}"
-                )
-            
-            with col2:
-                # 获取最近一次的分数变化
-                delta_points = st.session_state.history[0]['points'] if st.session_state.history else 0
-                st.metric(
-                    t['eco_score'],
-                    st.session_state.total_points,
-                    delta=f"+{delta_points}"
-                )
-            
-            with col3:
-                progress = get_level_progress()
+            with col1: st.metric(t['total_scans'], len(st.session_state.history))
+            with col2: st.metric(t['eco_score'], st.session_state.total_points)
+            with col3: 
                 st.metric(t['current_level'], get_level())
-                st.progress(progress)
-            
+                st.progress(get_level_progress())
             st.markdown("---")
             
-            # 分类分布
             st.markdown(f"### 📊 {t['category_breakdown']}")
-            
             category_counts = {}
             for record in st.session_state.history:
                 cat = record['category']
@@ -895,124 +719,51 @@ def main():
             values = list(category_counts.values())
             colors = [CATEGORIES[k]["color"] for k in category_counts.keys()]
             
-            fig = go.Figure(data=[go.Pie(
-                labels=labels,
-                values=values,
-                hole=0.5,
-                marker=dict(colors=colors),
-                textinfo='label+percent',
-                textfont=dict(size=14)
-            )])
-            
-            fig.update_layout(
-                showlegend=False,
-                height=400,
-                margin=dict(t=0, b=0, l=0, r=0)
-            )
-            
+            fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.5, marker=dict(colors=colors), textinfo='label+percent', textfont=dict(size=14))])
+            fig.update_layout(showlegend=False, height=400, margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig, use_container_width=True)
-            
             st.markdown("---")
             
-            # 最近活动
             st.markdown(f"### 🕐 {t['recent_activity']}")
-            
             for record in st.session_state.history[:10]:
-                cat = record['category']
-                cat_info = CATEGORIES[cat]
+                cat_info = CATEGORIES[record['category']]
                 name = cat_info["name"][st.session_state.lang]
-                icon = cat_info["icon"]
                 color = cat_info["color"]
-                
-                st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;align-items:center;"
-                    f"padding:16px;margin-bottom:10px;background:white;border-radius:12px;"
-                    f"border-left:4px solid {color};box-shadow:0 1px 3px rgba(0,0,0,0.05);'>"
-                    f"<div style='display:flex;align-items:center;gap:12px;'>"
-                    f"<span style='font-size:1.8rem;'>{icon}</span>"
-                    f"<div>"
-                    f"<div style='font-weight:600;color:#334155;'>{name}</div>"
-                    f"<div style='font-size:0.8rem;color:#94a3b8;'>{record['timestamp']}</div>"
-                    f"</div></div>"
-                    f"<div style='font-weight:700;color:{color};font-size:1.2rem;'>+{record['points']}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"<div style='display:flex;justify-content:space-between;align-items:center;padding:16px;margin-bottom:10px;background:white;border-radius:12px;border-left:4px solid {color};box-shadow:0 1px 3px rgba(0,0,0,0.05);'><div style='display:flex;align-items:center;gap:12px;'><span style='font-size:1.8rem;'>{cat_info['icon']}</span><div><div style='font-weight:600;color:#334155;'>{name}</div><div style='font-size:0.8rem;color:#94a3b8;'>{record['timestamp']}</div></div></div><div style='font-weight:700;color:{color};font-size:1.2rem;'>+{record['points']}</div></div>", unsafe_allow_html=True)
 
     # --- Tab 4: 个人资料 ---
-    with tab4:
-        # 用户信息卡片
+    elif selected_tab == t['nav_profile']:
         level = get_level()
-        progress = get_level_progress()
+        st.markdown(f"<div style='background:linear-gradient(135deg,#4facfe,#00f2fe);padding:50px;border-radius:24px;text-align:center;color:white;margin-bottom:30px;'><div style='font-size:5rem;margin-bottom:20px;'>👤</div><h2 style='color:white;margin:0;'>{st.session_state.username}</h2><p style='opacity:0.9;font-size:1.2rem;margin-top:10px;'>Level {level} EcoWarrior</p></div>", unsafe_allow_html=True)
         
-        st.markdown(
-            f"<div style='background:linear-gradient(135deg,#4facfe,#00f2fe);"
-            f"padding:50px;border-radius:24px;text-align:center;color:white;margin-bottom:30px;'>"
-            f"<div style='font-size:5rem;margin-bottom:20px;'>👤</div>"
-            f"<h2 style='color:white;margin:0;'>{st.session_state.username}</h2>"
-            f"<p style='opacity:0.9;font-size:1.2rem;margin-top:10px;'>Level {level} EcoWarrior</p>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-        
-        # 设置
         st.markdown(f"### ⚙️ {t['profile_settings']}")
-        
-        new_username = st.text_input(
-            t['username'],
-            value=st.session_state.username,
-            max_chars=20
-        )
-        
+        new_username = st.text_input(t['username'], value=st.session_state.username, max_chars=20)
         if new_username != st.session_state.username:
             if st.button(t['save_changes'], type="primary"):
                 st.session_state.username = new_username
                 st.success("✅ Saved!")
                 st.rerun()
-        
         st.markdown("---")
         
-        # 成就系统
         st.markdown(f"### 🏆 {t['achievements']}")
-        
         achievements_config = {
-            "beginner": ("🌱", t['badge_beginner'], 1),
-            "explorer": ("🔍", t['badge_explorer'], 10),
-            "expert": ("⚡", t['badge_expert'], 50),
-            "master": ("👑", t['badge_master'], 100),
-            "legend": ("🌟", t['badge_legend'], 500),
-            "streak": ("🔥", t['badge_streak'], 7),
-            "variety": ("🎨", t['badge_variety'], 4),
+            "beginner": ("🌱", t['badge_beginner']), "explorer": ("🔍", t['badge_explorer']),
+            "expert": ("⚡", t['badge_expert']), "master": ("👑", t['badge_master']),
+            "legend": ("🌟", t['badge_legend']), "streak": ("🔥", t['badge_streak']),
+            "variety": ("🎨", t['badge_variety']),
         }
-        
         cols = st.columns(4)
-        for idx, (key, (icon, name, threshold)) in enumerate(achievements_config.items()):
+        for idx, (key, (icon, name)) in enumerate(achievements_config.items()):
             unlocked = key in st.session_state.achievements
-            
             with cols[idx % 4]:
                 opacity = "1" if unlocked else "0.3"
                 filter_style = "" if unlocked else "filter:grayscale(100%);"
-                
-                st.markdown(
-                    f"<div style='text-align:center;padding:20px;background:#f8fafc;"
-                    f"border-radius:16px;border:2px solid {'#10b981' if unlocked else '#e2e8f0'};"
-                    f"opacity:{opacity};{filter_style}'>"
-                    f"<div style='font-size:3rem;margin-bottom:10px;'>{icon}</div>"
-                    f"<div style='font-weight:600;color:#334155;'>{name}</div>"
-                    f"<div style='font-size:0.75rem;color:#94a3b8;margin-top:5px;'>"
-                    f"{'✅ Unlocked' if unlocked else f'🔒 {t['locked']}'}"
-                    f"</div></div>",
-                    unsafe_allow_html=True
-                )
-        
+                st.markdown(f"<div style='text-align:center;padding:20px;background:#f8fafc;border-radius:16px;border:2px solid {'#10b981' if unlocked else '#e2e8f0'};opacity:{opacity};{filter_style}'><div style='font-size:3rem;margin-bottom:10px;'>{icon}</div><div style='font-weight:600;color:#334155;'>{name}</div><div style='font-size:0.75rem;color:#94a3b8;margin-top:5px;'>{'✅ Unlocked' if unlocked else f'🔒 {t['locked']}'}</div></div>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # 等级进度
         st.markdown(f"### 📈 {t['current_level']} Progress")
-        
         next_level_points = (level * 100) - (st.session_state.total_points % 100)
-        
-        st.progress(progress)
+        st.progress(get_level_progress())
         st.caption(f"Next level in {next_level_points} points")
 
 if __name__ == "__main__":
