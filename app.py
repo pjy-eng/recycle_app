@@ -222,139 +222,230 @@ TRANSLATIONS = {
 }
 
 # ==================================================
-# 5. 分类逻辑 (韩国标准) & 徽章配置
+# 5. 分类逻辑 (严格韩国垃圾分类标准)
 # ==================================================
 CATEGORIES = {
-    "plastic": {
-        "name": {"zh": "硬塑料", "en": "Plastic", "kr": "플라스틱 (투명/용기)"},
-        "icon": "🥤", "color": "#10b981", "points": 10,
-        "prompts": ["clear plastic bottle", "hard plastic container", "shampoo bottle", "pet bottle"],
-        "tips": {
-            "zh": "清洗内部，撕掉标签，压扁。",
-            "en": "Wash inside, remove label, compress.",
-            "kr": "내용물을 비우고 헹군 후, 라벨을 제거하고 압착하세요."
-        }
-    },
-    "vinyl": {
-        "name": {"zh": "塑料包装(Vinyl)", "en": "Vinyl/Wrapper", "kr": "비닐류 (라면/과자봉지)"},
-        "icon": "🍬", "color": "#a855f7", "points": 5,
-        "prompts": ["plastic snack bag", "ramen bag", "plastic wrapper", "crinkly plastic package"],
-        "tips": {
-            "zh": "必须干净！如果有油渍或食物残留，请丢一般垃圾。",
-            "en": "Must be clean! If dirty, throw in General Trash.",
-            "kr": "이물질이 없어야 합니다! 오염되었다면 일반쓰레기로 버리세요."
-        }
-    },
-    "styrofoam": {
-        "name": {"zh": "泡沫塑料", "en": "Styrofoam", "kr": "스티로폼"},
-        "icon": "❄️", "color": "#94a3b8", "points": 7,
-        "prompts": ["white styrofoam box", "clean styrofoam packaging"],
-        "tips": {
-            "zh": "仅限白色且干净的。去除胶带和运单。",
-            "en": "White and clean only. Remove tape/labels.",
-            "kr": "흰색의 깨끗한 것만 가능합니다. 테이프와 송장을 제거하세요."
-        }
-    },
+
+    # ===============================
+    # ♻️ 可回收 – 종이류
+    # ===============================
     "paper": {
-        "name": {"zh": "纸张/纸板", "en": "Paper/Box", "kr": "종이/박스"},
-        "icon": "📦", "color": "#d97706", "points": 8,
-        "prompts": ["cardboard box", "stack of newspapers", "paper document"],
+        "name": {"zh": "纸张/纸板", "en": "Paper", "kr": "종이류"},
+        "icon": "📦",
+        "color": "#d97706",
+        "points": 8,
+        "prompts": [
+            "clean cardboard box flattened",
+            "newspaper stack clean",
+            "paper package without tape"
+        ],
         "tips": {
-            "zh": "压平纸箱，去除胶带及订书钉。",
-            "en": "Flatten boxes, remove tape and staples.",
-            "kr": "박스는 납작하게 펴고, 테이프와 철심을 제거하세요."
+            "zh": "压平后投放，去除胶带、订书钉。",
+            "en": "Flatten and remove tape or staples.",
+            "kr": "박스는 펼쳐서 테이프·철심 제거 후 배출하세요."
         }
     },
+
+    # ===============================
+    # ♻️ 可回收 – 플라스틱
+    # ===============================
+    "plastic": {
+        "name": {"zh": "塑料容器", "en": "Plastic", "kr": "플라스틱"},
+        "icon": "🥤",
+        "color": "#10b981",
+        "points": 10,
+        "prompts": [
+            "clean plastic bottle without label",
+            "washed plastic container",
+            "empty shampoo bottle clean"
+        ],
+        "tips": {
+            "zh": "清洗干净，去除标签和异材质盖。",
+            "en": "Wash clean, remove labels and caps.",
+            "kr": "세척 후 라벨과 다른 재질의 뚜껑을 제거하세요."
+        }
+    },
+
+    # ===============================
+    # ♻️ 可回收 – 비닐류
+    # ===============================
+    "vinyl": {
+        "name": {"zh": "塑料包装", "en": "Vinyl", "kr": "비닐류"},
+        "icon": "🍬",
+        "color": "#a855f7",
+        "points": 5,
+        "prompts": [
+            "clean plastic wrapper",
+            "dry snack bag no oil",
+            "ramen plastic bag clean"
+        ],
+        "tips": {
+            "zh": "必须无油污，否则算一般垃圾。",
+            "en": "Only recyclable if clean and dry.",
+            "kr": "기름기·이물질이 있으면 일반쓰레기입니다."
+        }
+    },
+
+    # ===============================
+    # ♻️ 可回收 – 캔류 (金属)
+    # ===============================
     "can": {
-        "name": {"zh": "金属罐", "en": "Metal Can", "kr": "캔류 (고철)"},
-        "icon": "🥫", "color": "#3b82f6", "points": 15,
-        "prompts": ["aluminum soda can", "tuna can", "metal food can"],
+        "name": {"zh": "金属罐", "en": "Metal Can", "kr": "캔류"},
+        "icon": "🥫",
+        "color": "#3b82f6",
+        "points": 15,
+        "prompts": [
+            "empty aluminum soda can",
+            "clean metal food can",
+            "washed tuna can"
+        ],
         "tips": {
-            "zh": "清洗内部并压扁。",
-            "en": "Wash inside and compress.",
-            "kr": "내용물을 비우고 헹군 후, 가능한 찌그러뜨려주세요."
+            "zh": "清洗后压扁投放。",
+            "en": "Rinse and compress before recycling.",
+            "kr": "헹군 후 찌그러뜨려 배출하세요."
         }
     },
+
+    # ===============================
+    # ♻️ 可回收 – 유리병
+    # ===============================
     "glass": {
         "name": {"zh": "玻璃瓶", "en": "Glass Bottle", "kr": "유리병"},
-        "icon": "🍾", "color": "#0ea5e9", "points": 12,
-        "prompts": ["glass bottle", "soju bottle", "beer bottle"],
+        "icon": "🍾",
+        "color": "#0ea5e9",
+        "points": 12,
+        "prompts": [
+            "clean glass bottle empty",
+            "washed soju bottle",
+            "beer bottle without cigarette"
+        ],
         "tips": {
-            "zh": "清洗干净。镜子和陶瓷不是玻璃回收物！",
-            "en": "Wash clean. Mirrors/Ceramics are NOT recyclable.",
-            "kr": "깨끗이 씻어주세요. 거울, 도자기는 재활용이 아닙니다!"
+            "zh": "仅限瓶子，镜子、陶瓷不属于玻璃回收。",
+            "en": "Bottles only. No mirrors or ceramics.",
+            "kr": "병만 가능. 거울·도자기는 일반쓰레기입니다."
         }
     },
+
+    # ===============================
+    # ♻️ 可回收 – 스티로폼
+    # ===============================
+    "styrofoam": {
+        "name": {"zh": "泡沫塑料", "en": "Styrofoam", "kr": "스티로폼"},
+        "icon": "❄️",
+        "color": "#94a3b8",
+        "points": 7,
+        "prompts": [
+            "clean white styrofoam box",
+            "white foam packaging clean"
+        ],
+        "tips": {
+            "zh": "仅限白色且干净的。",
+            "en": "Only white and clean styrofoam.",
+            "kr": "흰색이고 깨끗한 것만 가능합니다."
+        }
+    },
+
+    # ===============================
+    # 🍎 食物垃圾 – 음식물
+    # ===============================
     "food": {
-        "name": {"zh": "食物垃圾", "en": "Food Waste", "kr": "음식물 쓰레기"},
-        "icon": "🍎", "color": "#facc15", "points": 2,
-        "prompts": ["leftover food", "fruit peels", "vegetable scraps"],
+        "name": {"zh": "厨余垃圾", "en": "Food Waste", "kr": "음식물쓰레기"},
+        "icon": "🍎",
+        "color": "#facc15",
+        "points": 2,
+        "prompts": [
+            "food leftovers",
+            "fruit peels",
+            "vegetable scraps"
+        ],
         "tips": {
-            "zh": "沥干水分。骨头、贝壳属于一般垃圾。",
-            "en": "Drain water. Bones/Shells are General Trash.",
-            "kr": "물기를 제거하세요. 뼈, 조개껍데기는 일반쓰레기입니다."
+            "zh": "去水，骨头、贝壳是一般垃圾。",
+            "en": "Drain water. Bones and shells are trash.",
+            "kr": "물기 제거. 뼈·조개껍데기는 일반쓰레기입니다."
         }
     },
-    "trash": {
-        "name": {"zh": "一般垃圾", "en": "General Trash", "kr": "일반쓰레기 (종량제)"},
-        "icon": "🗑️", "color": "#475569", "points": 1,
-        "prompts": ["dirty tissue", "broken ceramic", "dirty food packaging", "mixed garbage"],
+
+    # ===============================
+    # 🔋 特殊垃圾
+    # ===============================
+    "special": {
+        "name": {"zh": "特殊垃圾", "en": "Special Waste", "kr": "특수쓰레기"},
+        "icon": "🔋",
+        "color": "#ef4444",
+        "points": 0,
+        "prompts": [
+            "used battery",
+            "fluorescent lamp",
+            "medicine pills"
+        ],
         "tips": {
-            "zh": "使用计量垃圾袋。脏污无法清洗的物品都在这里。",
-            "en": "Use standard trash bags. Dirty items go here.",
-            "kr": "종량제 봉투를 사용하세요. 오염된 비닐/플라스틱은 여기입니다."
+            "zh": "送至指定回收点。",
+            "en": "Dispose at special collection points.",
+            "kr": "지정 수거함에 배출하세요."
+        }
+    },
+
+    # ===============================
+    # 🗑️ 一般垃圾 – 종량제
+    # ===============================
+    "trash": {
+        "name": {"zh": "一般垃圾", "en": "General Trash", "kr": "일반쓰레기"},
+        "icon": "🗑️",
+        "color": "#475569",
+        "points": 1,
+        "prompts": [
+            "dirty plastic packaging",
+            "broken ceramic",
+            "mirror glass",
+            "greasy food wrapper",
+            "mixed garbage"
+        ],
+        "tips": {
+            "zh": "使用韩国指定垃圾袋。",
+            "en": "Use official Korean trash bags.",
+            "kr": "종량제 봉투를 사용하세요."
         }
     },
 }
 
-BADGES = [
-    {"key": "badge_starter", "threshold": 0, "icon": "🌱", "color": "#10b981"},
-    {"key": "badge_bronze", "threshold": 50, "icon": "🥉", "color": "#cd7f32"},
-    {"key": "badge_silver", "threshold": 200, "icon": "🥈", "color": "#94a3b8"},
-    {"key": "badge_gold", "threshold": 500, "icon": "🥇", "color": "#fbbf24"},
-]
-
 # ==================================================
-# 6. AI 模型
+# 6.AI 分类逻辑（韩国规则兜底）
 # ==================================================
-@st.cache_resource
-def load_clip_model():
-    try:
-        model_id = "openai/clip-vit-base-patch32"
-        processor = CLIPProcessor.from_pretrained(model_id)
-        model = CLIPModel.from_pretrained(model_id)
-        model.eval()
-        return processor, model
-    except Exception as e:
-        return None, None
-
-processor, model = load_clip_model()
-
 def classify_image(image):
-    if not processor or not model: return "trash", 0.0
-    
-    # 图像预处理
+    if not processor or not model:
+        return "trash", 0.0
+
     image = image.resize((384, 384), Image.Resampling.LANCZOS)
-    enhancer = ImageEnhance.Contrast(image)
-    image = enhancer.enhance(1.2)
-    
+    image = ImageEnhance.Contrast(image).enhance(1.2)
+
     category_keys = list(CATEGORIES.keys())
-    prompts = [f"a photo of {random.choice(CATEGORIES[key]['prompts'])}" for key in category_keys]
-    
-    inputs = processor(text=prompts, images=image, return_tensors="pt", padding=True)
+    prompts = [
+        f"a photo of {random.choice(CATEGORIES[k]['prompts'])}"
+        for k in category_keys
+    ]
+
+    inputs = processor(
+        text=prompts,
+        images=image,
+        return_tensors="pt",
+        padding=True
+    )
+
     with torch.no_grad():
         outputs = model(**inputs)
-    
+
     probs = outputs.logits_per_image.softmax(dim=1)
-    confidence, idx = torch.max(probs, dim=-1)
-    
-    category = category_keys[idx.item()]
+    confidence, idx = torch.max(probs, dim=1)
+
     conf_val = confidence.item()
-    
-    if conf_val < 0.25: 
+    category = category_keys[idx.item()]
+
+    # 🇰🇷 韩国规则：不确定 = 一般垃圾
+    if conf_val < 0.28:
         return "trash", conf_val
-        
+
     return category, conf_val
+
 
 # ==================================================
 # 7. UI 组件
