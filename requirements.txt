@@ -1,7 +1,8 @@
 streamlit
 torch
 torchvision
+transformers
 Pillow
 plotly
-streamlit-lottie
 requests
+streamlit-lottie
