@@ -99,7 +99,7 @@ def init_session_state():
 init_session_state()
 
 # ==================================================
-# 4. 严格的多语言字典 (确保不混合)
+# 4. 严格的多语言字典
 # ==================================================
 TRANSLATIONS = {
     "kr": {
@@ -107,41 +107,34 @@ TRANSLATIONS = {
         "tagline": "AI로 완벽한 분리수거",
         "nav_home": "🏠 홈", "nav_scan": "📸 스캔", "nav_insights": "📊 통계", "nav_profile": "👤 내 정보",
         
-        # Hero Section
         "hero_title": "이 쓰레기, 어떻게 버리죠?",
         "hero_subtitle": "사진을 찍으면 올바른 분리배출 방법을 알려드립니다",
         
-        # 步骤 (Steps) - 纯韩语
         "step1_title": "1. 촬영/업로드", "step1_desc": "쓰레기 사진을 찍으세요",
         "step2_title": "2. AI 분석", "step2_desc": "종류와 배출 방법을 확인하세요",
         "step3_title": "3. 포인트 획득", "step3_desc": "환경을 지키고 보상을 받으세요",
         
-        # 快速指南 (Quick Guide)
         "guide_plastic": "플라스틱", "guide_plastic_desc": "헹구고 라벨 제거",
         "guide_vinyl": "비닐류", "guide_vinyl_desc": "깨끗한 상태로 배출",
         "guide_paper": "종이/박스", "guide_paper_desc": "펼쳐서 배출",
         "guide_trash": "일반쓰레기", "guide_trash_desc": "오염된 것은 여기로",
         "quick_guide_title": "📋 분리수거 핵심 가이드",
 
-        # 功能按钮
         "upload_btn": "📂 사진 업로드", "camera_btn": "📷 카메라",
         "scan_action": "🔍 분석 시작",
         "analyzing": "AI가 분석 중입니다...",
         
-        # 结果页
         "result_title": "분석 결과", "confidence": "정확도",
         "points_earned": "획득 포인트",
         "disposal_guide": "🗑️ 배출 방법 가이드",
         "low_conf_msg": "⚠️ 확실하지 않습니다. 이물질이 많다면 일반쓰레기로 버려주세요.",
         "btn_scan_again": "다시 스캔하기", "btn_check_stats": "통계 확인",
         
-        # 统计 & 个人
         "total_scans": "총 스캔", "eco_points": "에코 포인트", "level": "레벨",
         "history_title": "최근 활동", "no_data": "아직 기록이 없습니다.",
         "badges_title": "🏆 나의 배지 컬렉션",
         "save": "저장", "username": "닉네임", "saved_msg": "저장되었습니다!",
         
-        # 徽章名称
         "badge_starter": "시작하는 환경지킴이",
         "badge_bronze": "브론즈 리사이클러",
         "badge_silver": "실버 마스터",
@@ -314,7 +307,6 @@ CATEGORIES = {
     },
 }
 
-# 徽章配置 (积分阈值)
 BADGES = [
     {"key": "badge_starter", "threshold": 0, "icon": "🌱", "color": "#10b981"},
     {"key": "badge_bronze", "threshold": 50, "icon": "🥉", "color": "#cd7f32"},
@@ -359,7 +351,7 @@ def classify_image(image):
     category = category_keys[idx.item()]
     conf_val = confidence.item()
     
-    if conf_val < 0.25: # 阈值
+    if conf_val < 0.25: 
         return "trash", conf_val
         
     return category, conf_val
@@ -387,13 +379,10 @@ def render_badges_section(t):
     
     for idx, badge in enumerate(BADGES):
         is_unlocked = current_points >= badge['threshold']
-        
-        # 样式逻辑：解锁显示彩色，未解锁显示灰色+锁
         opacity = "1" if is_unlocked else "0.5"
         grayscale = "0" if is_unlocked else "100%"
         border_color = badge['color'] if is_unlocked else "#e2e8f0"
         
-        # 徽章名称和状态文本
         badge_name = t[badge['key']]
         status_text = f"✅ {badge['threshold']} pts" if is_unlocked else f"🔒 {badge['threshold']} pts"
         
@@ -472,9 +461,12 @@ def main():
             """, unsafe_allow_html=True)
             
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(t['scan_action'], type="primary", use_container_width=True):
+        
+        # 修复后的按钮逻辑：使用 on_click 回调
+        def go_to_scan():
             st.session_state.current_tab = t['nav_scan']
-            st.rerun()
+            
+        st.button(t['scan_action'], type="primary", use_container_width=True, on_click=go_to_scan)
 
     # --- 2. 扫描 (SCAN) ---
     elif selected_tab == t['nav_scan']:
@@ -490,28 +482,28 @@ def main():
         if img_buffer:
             image = Image.open(img_buffer).convert("RGB")
             
-            # --- 图片尺寸优化：使用三列布局，图片放中间 ---
+            # --- 图片尺寸优化 ---
             st.markdown("<br>", unsafe_allow_html=True)
             ic1, ic2, ic3 = st.columns([1, 2, 1]) 
             with ic2:
                 st.image(image, use_container_width=True, caption="Preview")
-            # ----------------------------------------
+            # --------------------
             
             st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 按钮的回调不需要，因为这里不需要跳转页面，只需要执行逻辑
             if st.button(t['scan_action'], type="primary", use_container_width=True):
                 with st.spinner(t['analyzing']):
-                    time.sleep(0.8) # 模拟分析时间
+                    time.sleep(0.8) 
                     cat, conf = classify_image(image)
                     info = CATEGORIES[cat]
                     
-                    # 记录数据
                     pts = info['points']
                     st.session_state.total_points += pts
                     st.session_state.history.insert(0, {
                         "cat": cat, "conf": conf, "date": datetime.now().strftime("%m-%d %H:%M"), "pts": pts
                     })
                     
-                    # 结果展示
                     st.balloons()
                     st.markdown(f"""
                     <div style='background-color:#fff; border:2px solid {info['color']}; border-radius:20px; padding:30px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.05); margin-top:20px;'>
@@ -523,7 +515,6 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 清洁指南
                     st.markdown(f"### {t['disposal_guide']}")
                     st.info(info['tips'][st.session_state.lang], icon="💡")
                     
@@ -533,16 +524,17 @@ def main():
                     ac1, ac2 = st.columns(2)
                     if ac1.button(t['btn_scan_again'], use_container_width=True):
                         st.rerun()
-                    if ac2.button(t['btn_check_stats'], use_container_width=True):
+                    
+                    # 使用回调跳转统计页
+                    def go_to_insights():
                         st.session_state.current_tab = t['nav_insights']
-                        st.rerun()
+                    ac2.button(t['btn_check_stats'], use_container_width=True, on_click=go_to_insights)
 
     # --- 3. 统计 (INSIGHTS) ---
     elif selected_tab == t['nav_insights']:
         if not st.session_state.history:
             st.info(t['no_data'])
         else:
-            # 饼图
             counts = {}
             for h in st.session_state.history:
                 counts[h['cat']] = counts.get(h['cat'], 0) + 1
@@ -555,7 +547,6 @@ def main():
             fig.update_layout(height=300, margin=dict(t=0,b=0,l=0,r=0))
             st.plotly_chart(fig, use_container_width=True)
             
-            # 列表
             st.markdown(f"### {t['history_title']}")
             for h in st.session_state.history[:10]:
                 info = CATEGORIES[h['cat']]
@@ -574,7 +565,6 @@ def main():
 
     # --- 4. 个人 (PROFILE) ---
     elif selected_tab == t['nav_profile']:
-        # 个人卡片
         st.markdown(f"""
         <div style='text-align:center; padding:40px; background:linear-gradient(to right, #6366f1, #8b5cf6); border-radius:20px; color:white; margin-bottom:30px;'>
             <div style='font-size:4rem; margin-bottom:10px;'>😎</div>
@@ -584,12 +574,10 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # 徽章墙 (集成新功能)
         render_badges_section(t)
         
         st.markdown("---")
         
-        # 设置
         new_name = st.text_input(t['username'], st.session_state.username)
         if new_name != st.session_state.username:
             if st.button(t['save'], type="primary"):
